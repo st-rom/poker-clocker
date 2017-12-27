@@ -49,136 +49,107 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-GPIO_InitTypeDef _GPIO_InitStructKeypad;
 
-#define RCC_APB2Periph_GPIOA             ((uint32_t)0x00000004)
+/* USER CODE BEGIN PV */
+/* Private variables ---------------------------------------------------------*/
 
-#define KEYPAD_RCC_GPIO_COL		RCC_APB2Periph_GPIOA
-#define KEYPAD_GPIO_COL0				GPIOA
-#define KEYPAD_GPIO_COL1			GPIOC
-#define KEYPAD_GPIO_COL2				GPIOB
-#define KEYPAD_GPIO_COL3				GPIOE
 #define KEYPAD_PIN_COL0				GPIO_PIN_7
 #define KEYPAD_PIN_COL1				GPIO_PIN_5
 #define KEYPAD_PIN_COL2				GPIO_PIN_1
 #define KEYPAD_PIN_COL3				GPIO_PIN_7
-// GPIO pin definitions for keypad rows (must on the same GPIO)
-#define KEYPAD_RCC_GPIO_ROW		RCC_APB2Periph_GPIOA
-#define KEYPAD_GPIO_ROW				GPIOA
-#define KEYPAD_GPIO_ROW1				GPIOF
-#define KEYPAD_PIN_ROW0				GPIO_PIN_1
-#define KEYPAD_PIN_ROW1				GPIO_PIN_3
-#define KEYPAD_PIN_ROW2				GPIO_PIN_4
-#define KEYPAD_PIN_ROW3				GPIO_PIN_5
+#define KEYPAD_GPIO_COL0			GPIOA
+#define KEYPAD_GPIO_COL1			GPIOC
+#define KEYPAD_GPIO_COL2			GPIOB
+#define KEYPAD_GPIO_COL3			GPIOE
+const unsigned gpios[] = {KEYPAD_GPIO_COL0, KEYPAD_GPIO_COL1, KEYPAD_GPIO_COL2, KEYPAD_GPIO_COL3};
+const unsigned pins[] = {KEYPAD_PIN_COL0, KEYPAD_PIN_COL1, KEYPAD_PIN_COL2, KEYPAD_PIN_COL3};
 // Return value for no key pressed
-#define KEYPAD_NO_PRESSED			0xFF
-/* USER CODE BEGIN PV */
-/* Private variables ---------------------------------------------------------*/
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-void KeypadInit(void);
 uint8_t KeypadGetKey(void);
 
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-
+int my_time[7] = {0, 0, 0, 0, 0, 0 ,0};
+int kom = 0;
+int current = 0;
+int dec = 0;
+double start = 0;
+double changed = 0;
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+ printf("%d\n", gpios[3] == 1);
+ if( GPIO_Pin == UButton0_Pin || GPIO_Pin == UButton1_Pin || GPIO_Pin == UButton2_Pin || GPIO_Pin == UButton3_Pin)
+ {
+  static uint32_t last_change_tick;
+  if( HAL_GetTick() - last_change_tick < 20 )
+  {
+   return;
+  }
+  last_change_tick = HAL_GetTick();
+  int length = strlen(my_time);
+  const unsigned ubuttons[] = {UButton0_Pin, UButton1_Pin, UButton2_Pin, UButton3_Pin};
+  char symbs[4][4] = {{'1', '4', '7', '*'}, {'2', '5', '8', '0'}, {'3', '6', '9', '#'}, {'A', 'B', 'C', 'D'}};
+  for(int i = 0; i < 4; i++){
+	  if(HAL_GPIO_ReadPin(gpios[i], pins[i])){
+		  for(int j = 0; j < 4; j++){
+			  //printf("%d, %d,\n", GPIO_Pin == UButton2_Pin, i);
+			  if (GPIO_Pin == ubuttons[j]){
+				  printf("%c %d %d\n", symbs[i][j], GPIO_Pin == UButton2_Pin, i == 3);
+			  }
+			  if (GPIO_Pin == UButton2_Pin && i == 3 && length != 0 && start == 0){
+				  kom = 0;
+				  dec = 0;
+				  return;
+			  }
+			  else if(GPIO_Pin == UButton1_Pin && i == 3 && current < 7 && start == 0){
+				  my_time[current] = kom;
+				  current++;
+				  kom = 0;
+				  dec = 0;
+				  changed = 1;
+				  return;
+			  }
+			  else if(GPIO_Pin == UButton0_Pin && i == 3 && current > 0 && start == 0){
+				  my_time[current] = kom;
+				  current--;
+				  dec = 2;
+				  changed = 1;
+				  return;
+			  }
+			  else if(GPIO_Pin == UButton3_Pin && i == 3){
+				  if (start == 0){
+					  start = 1;
+				  }
+				  else{
+					  start = 0;
+				  }
+				  changed = 1;
+				  return;
+			  }
+			  else if (GPIO_Pin == ubuttons[j] && symbs[i][j] != '*' && symbs[i][j] != '#' && i != 3 && start == 0){
+				  if (dec == 0){
+					  kom += symbs[i][j] - '0';
+				  }
+				  else if (dec == 1){
+					  kom *= 10;
+					  kom += (symbs[i][j] - '0');
+				  }
+				  dec++;
+				  return;
+			  }
+		  }
+	  }
+  }
+ }
+}
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-/*
-void KeypadInit()
-{
-
-	DelayInit();
-
-	// GPIO clock for keypad columns and rows
-	RCC_APB2PeriphClockCmd(GPIOA, ENABLE);
-	RCC_APB2PeriphClockCmd(GPIOC, ENABLE);
-	RCC_APB2PeriphClockCmd(GPIOB, ENABLE);
-	RCC_APB2PeriphClockCmd(GPIOE, ENABLE);
-
-	RCC_APB2PeriphClockCmd(GPIOA, ENABLE);
-	RCC_APB2PeriphClockCmd(GPIOF, ENABLE);
-
-	// Configure GPIO as output open drain for keypad columns
-
-	_GPIO_InitStructKeypad.GPIO_Pin = KEYPAD_PIN_COL0 | KEYPAD_PIN_COL1 |
-		KEYPAD_PIN_COL2 | KEYPAD_PIN_COL3;
-	_GPIO_InitStructKeypad.GPIO_Mode = GPIO_Mode_Out_OD;
-	_GPIO_InitStructKeypad.GPIO_Speed = GPIO_Speed_2MHz;
-	GPIO_Init(KEYPAD_GPIO_COL, &_GPIO_InitStructKeypad);
-
-	// Configure GPIO as input with pull-up resistor for keypad rows
-	_GPIO_InitStructKeypad.GPIO_Pin = KEYPAD_PIN_ROW0 | KEYPAD_PIN_ROW1 |
-		KEYPAD_PIN_ROW2 | KEYPAD_PIN_ROW3;
-	_GPIO_InitStructKeypad.GPIO_Mode = GPIO_Mode_IPU;
-	_GPIO_InitStructKeypad.GPIO_Speed = GPIO_Speed_2MHz;
-	GPIO_Init(KEYPAD_GPIO_ROW, &_GPIO_InitStructKeypad);
-
-}
-*/
-
-
-uint8_t KeypadGetKey()
-{
-	const unsigned gpios[] = {KEYPAD_GPIO_COL0, KEYPAD_GPIO_COL1, KEYPAD_GPIO_COL2, KEYPAD_GPIO_COL3};
-	const unsigned pins[] = {KEYPAD_PIN_COL0, KEYPAD_PIN_COL1, KEYPAD_PIN_COL2, KEYPAD_PIN_COL3};
-	for(int i = 0; i < 4; i++){
-		for(int j = 0; j < 4; j++){
-			if(i == j){
-				HAL_GPIO_WritePin(gpios[i], pins[i], GPIO_PIN_SET);
-			}
-			else{
-				HAL_GPIO_WritePin(gpios[i], pins[i], GPIO_PIN_RESET);
-			}
-		}
-		if(HAL_GPIO_ReadPin(KEYPAD_GPIO_COL0, KEYPAD_PIN_COL0)){
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW0))
-				return '1';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW1))
-				return '4';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW1, KEYPAD_PIN_ROW2))
-				return '7';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW3))
-				return '*';
-		}
-		if(HAL_GPIO_ReadPin(KEYPAD_GPIO_COL1, KEYPAD_PIN_COL1)){
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW0))
-				return '2';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW1))
-				return '5';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW1, KEYPAD_PIN_ROW2))
-				return '8';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW3))
-				return '0';
-		}
-		if(HAL_GPIO_ReadPin(KEYPAD_GPIO_COL2, KEYPAD_PIN_COL2)){
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW0))
-				return '3';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW1))
-				return '6';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW1, KEYPAD_PIN_ROW2))
-				return '9';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW3))
-				return '#';
-		}
-		if(HAL_GPIO_ReadPin(KEYPAD_GPIO_COL3, KEYPAD_PIN_COL3)){
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW0))
-				return 'A';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW1))
-				return 'B';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW1, KEYPAD_PIN_ROW2))
-				return 'C';
-			if (HAL_GPIO_ReadPin(KEYPAD_GPIO_ROW, KEYPAD_PIN_ROW3))
-				return 'D';
-		}
-		return KEYPAD_NO_PRESSED;
-	}
-}
 
 
 /* USER CODE END 0 */
@@ -217,16 +188,40 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint8_t key;
+  int i = 0;
   while (1)
   {
-	  	  	key = KeypadGetKey();
-
-	  		// Display pressed char to LCD
-	  		if (key != KEYPAD_NO_PRESSED)
-	  		{
-	  			printf("%c\n", key);
-	  		}
+	 if(changed == 1){
+		 __disable_irq();
+		 /*
+		 for(int i = 0; i < strlen(my_time); i++){
+			 if(i % 2 == 0){
+				 printf(" ");
+			 }
+			 printf("%c", my_time[i]);
+		 }
+		 */
+		 printf("year -- %d, month -- %d, date -- %d, weekday -- %d\n%d:%d:%d\n", my_time[0], my_time[1], my_time[2], my_time[3], my_time[4], my_time[5], my_time[6]);
+		 changed = 0;
+		 __enable_irq();
+	 }
+	 //for(int i = 0; i < 4; i++){
+		 __disable_irq();
+		 HAL_NVIC_DisableIRQ(EXTI0_IRQn);
+		 for(int j = 0; j < 4; j++){
+			 if(i == j){
+				 HAL_GPIO_WritePin(gpios[j], pins[j], GPIO_PIN_SET);
+			 }
+			 else{
+				 HAL_GPIO_WritePin(gpios[j], pins[j], GPIO_PIN_RESET);
+			 }
+		 }
+		 __enable_irq();
+		 i++;
+		 if(i == 4){
+			 i = 0;
+		 }
+	 //}
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
